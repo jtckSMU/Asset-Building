@@ -944,7 +944,37 @@
   .deck-ui { display: none; }
   body.deck .deck-ui { display: block; }
   .deck-ui .layer { transition: opacity .35s ease; }
-  body.deck-idle .deck-ui .layer.fades { opacity: 0; pointer-events: none; }
+  /* the bar stays out of sight until you reach for the bottom of the screen */
+  body.deck .deck-bar { opacity: 0; pointer-events: none; }
+  body.deck.chrome-on .deck-bar { opacity: 1; pointer-events: auto; }
+  .deck-edge { position: fixed; left: 0; right: 0; bottom: 0; height: 46px; z-index: 79; display: none; }
+  body.deck .deck-edge { display: block; }
+  body.deck.draw-on .deck-edge { display: none; }
+
+  /* annotation layer */
+  .deck-draw { position: fixed; inset: 0; z-index: 78; display: none; touch-action: none; }
+  body.deck .deck-draw { display: block; pointer-events: none; }
+  body.deck.draw-on .deck-draw { pointer-events: auto; cursor: crosshair; }
+  .deck-tools {
+    position: fixed; top: 16px; right: 16px; z-index: 88; display: none;
+    gap: 7px; align-items: center; padding: 7px 9px; border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    backdrop-filter: blur(10px); border: 1px solid var(--grid); box-shadow: var(--shadow);
+  }
+  body.deck.draw-on .deck-tools { display: flex; }
+  .deck-tools .sw {
+    width: 24px; height: 24px; border-radius: 50%; padding: 0; cursor: pointer;
+    border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(128,128,128,.35);
+  }
+  .deck-tools .sw[aria-pressed="true"] { border-color: var(--ink); }
+  .deck-tools .tool {
+    font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink-2);
+    background: transparent; border: 1px solid var(--grid); border-radius: 8px; padding: 4px 10px;
+  }
+  .deck-tools .tool:hover { border-color: var(--gold); color: var(--ink); }
+  .deck-tools .tool[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .deck-tools .sep { width: 1px; height: 22px; background: var(--grid); }
+  .deck-tools button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
   /* status bar + key strip */
   .deck-bar {
@@ -1070,7 +1100,7 @@
   ];
 
   var body = document.body;
-  var st = { on: false, i: 0, step: 0, mode: "step", toc: false, presenter: false, from: null, t0: 0 };
+  var st = { on: false, i: 0, step: 0, mode: "step", toc: false, presenter: false, draw: false, from: null, t0: 0 };
   var ui = {};
   var idleTimer, clockTimer, toastTimer;
 
@@ -1089,6 +1119,7 @@
     { k: "A", label: "All", act: function () { setMode("all"); }, pressed: function () { return st.mode === "all"; } },
     { k: "F", label: "Full screen", act: toggleFull, pressed: function () { return !!document.fullscreenElement; } },
     { k: "P", label: "Presenter", act: function () { setPresenter(!st.presenter); }, pressed: function () { return st.presenter; } },
+    { k: "D", label: "Draw", act: function () { setDraw(!st.draw); }, pressed: function () { return st.draw; } },
     { k: "←", label: "Back", act: back },
     { k: "→", label: "Next", act: next },
     { k: "Esc", label: "Exit", act: escape }
@@ -1130,7 +1161,7 @@
         '<span><i class="dot green"></i>what to do about it</span>' +
       '</p>' +
       '<ol></ol>' +
-      '<p class="hint">Press a number key to jump straight there. Backspace returns you to the slide you left.</p>' +
+      '<p class="hint">Press a number key to jump straight there. Backspace returns you to the slide you left. D draws on the slide; the bar of keys appears when you move the pointer to the bottom of the screen.</p>' +
     '</div>';
   var list = toc.querySelector("ol");
   SLIDES.forEach(function (s, i) {
@@ -1156,8 +1187,14 @@
     '<div class="k">Points left</div><div class="v left"></div>';
 
   var toast = el("div", "deck-toast layer");
+  var edge = el("div", "deck-edge");
+  var canvas = el("canvas", "deck-draw");
+  var tools = el("div", "deck-tools");
 
   root.appendChild(bar);
+  root.appendChild(edge);
+  root.appendChild(canvas);
+  root.appendChild(tools);
   root.appendChild(toc);
   root.appendChild(presenter);
   root.appendChild(toast);
@@ -1214,13 +1251,129 @@
     st.on = false;
     setToc(false);
     setPresenter(false);
+    setDraw(false);
+    clearInk();
     clearInterval(clockTimer);
     var node = SLIDES[st.i].node;
-    body.classList.remove("deck", "deck-idle");
+    body.classList.remove("deck", "deck-idle", "chrome-on");
     SLIDES.forEach(function (s) { s.node.classList.remove("deck-active"); });
     Array.prototype.forEach.call(document.querySelectorAll("[data-step]"), function (n) { n.classList.remove("step-on"); });
     Array.prototype.forEach.call(document.querySelectorAll(".wrap"), function (w) { w.style.removeProperty("--deck-k"); });
     node.scrollIntoView();
+  }
+
+  /* ---------- drawing on the slide ---------- */
+  var ctx = canvas.getContext("2d");
+  var pen = { color: "--ink", width: 3, marker: false, eraser: false, drawing: false };
+
+  var SWATCHES = [
+    { v: "--ink", label: "Ink" },
+    { v: "--red", label: "Red" },
+    { v: "--gold-mark", label: "Gold" },
+    { v: "--green", label: "Green" }
+  ];
+  SWATCHES.forEach(function (s) {
+    var b = el("button", "sw");
+    b.type = "button";
+    b.title = s.label;
+    b.setAttribute("aria-label", s.label);
+    b.dataset.v = s.v;
+    tools.appendChild(b);
+    b.addEventListener("click", function () {
+      pen.color = s.v; pen.eraser = false;
+      paintTools(); b.blur();
+    });
+    s.btn = b;
+  });
+  tools.appendChild(el("span", "sep"));
+  function toolBtn(label, title, fn) {
+    var b = el("button", "tool", label);
+    b.type = "button";
+    b.title = title;
+    b.addEventListener("click", function () { fn(); b.blur(); });
+    tools.appendChild(b);
+    return b;
+  }
+  var markerBtn = toolBtn("Marker", "Thick translucent marker", function () { pen.marker = !pen.marker; pen.eraser = false; paintTools(); });
+  var eraserBtn = toolBtn("Eraser", "Rub out (E)", function () { pen.eraser = !pen.eraser; paintTools(); });
+  toolBtn("Clear", "Clear the slide (C)", clearInk);
+  toolBtn("Done", "Stop drawing (D or Esc)", function () { setDraw(false); });
+
+  function tokenColor(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#000";
+  }
+
+  function paintTools() {
+    SWATCHES.forEach(function (s) {
+      s.btn.style.background = tokenColor(s.v);
+      s.btn.setAttribute("aria-pressed", (!pen.eraser && pen.color === s.v) ? "true" : "false");
+    });
+    markerBtn.setAttribute("aria-pressed", pen.marker ? "true" : "false");
+    eraserBtn.setAttribute("aria-pressed", pen.eraser ? "true" : "false");
+  }
+
+  function sizeCanvas() {
+    /* keep whatever is already drawn — a resize must not wipe the annotations */
+    var kept = null;
+    if (canvas.width && canvas.height) {
+      kept = document.createElement("canvas");
+      kept.width = canvas.width;
+      kept.height = canvas.height;
+      kept.getContext("2d").drawImage(canvas, 0, 0);
+    }
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(window.innerWidth * dpr);
+    canvas.height = Math.round(window.innerHeight * dpr);
+    canvas.style.width = window.innerWidth + "px";
+    canvas.style.height = window.innerHeight + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    if (kept) ctx.drawImage(kept, 0, 0, window.innerWidth, window.innerHeight);
+  }
+
+  function clearInk() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+
+  function strokeStyle() {
+    if (pen.eraser) {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.strokeStyle = "rgba(0,0,0,1)";
+      ctx.lineWidth = 28;
+      ctx.globalAlpha = 1;
+      return;
+    }
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = tokenColor(pen.color);
+    ctx.lineWidth = pen.marker ? 16 : 3;
+    ctx.globalAlpha = pen.marker ? 0.32 : 1;
+  }
+
+  canvas.addEventListener("pointerdown", function (e) {
+    if (!st.draw) return;
+    pen.drawing = true;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* synthetic or stale pointer */ }
+    strokeStyle();
+    ctx.beginPath();
+    ctx.moveTo(e.clientX, e.clientY);
+    ctx.lineTo(e.clientX + 0.01, e.clientY);
+    ctx.stroke();
+  });
+  canvas.addEventListener("pointermove", function (e) {
+    if (!pen.drawing) return;
+    ctx.lineTo(e.clientX, e.clientY);
+    ctx.stroke();
+  });
+  function endStroke() { pen.drawing = false; }
+  canvas.addEventListener("pointerup", endStroke);
+  canvas.addEventListener("pointercancel", endStroke);
+  canvas.addEventListener("pointerleave", endStroke);
+
+  function setDraw(v) {
+    st.draw = v;
+    body.classList.toggle("draw-on", v);
+    if (v) { sizeCanvas(); paintTools(); }
+    else { pen.drawing = false; }
+    paint();
   }
 
   /* scale the active slide so it lands on one screen, never scrolling */
@@ -1243,6 +1396,7 @@
     SLIDES.forEach(function (s, k) { s.node.classList.toggle("deck-active", k === st.i); });
     SLIDES[st.i].node.scrollTop = 0;
     st.step = st.mode === "all" ? SLIDES[st.i].points.length : 0;
+    clearInk();
     paint();
     fit();
   }
@@ -1318,6 +1472,7 @@
 
   function escape() {
     if (lightboxOpen()) return;
+    if (st.draw) { setDraw(false); return; }
     if (st.presenter) { setPresenter(false); return; }
     if (st.toc) { setToc(false); return; }
     if (document.fullscreenElement) { document.exitFullscreen(); return; }
@@ -1329,17 +1484,25 @@
     ui.clock.textContent = ("0" + Math.floor(s / 60)).slice(-2) + ":" + ("0" + (s % 60)).slice(-2);
   }
 
+  /* the bar is invisible until the pointer reaches the bottom of the screen */
   function activity() {
     if (!st.on) return;
-    body.classList.remove("deck-idle");
     clearTimeout(idleTimer);
     idleTimer = setTimeout(function () {
-      if (st.on && !st.toc && !st.presenter) body.classList.add("deck-idle");
+      if (st.on && !st.toc && !st.presenter) body.classList.remove("chrome-on");
     }, 2600);
   }
-  document.addEventListener("mousemove", activity);
-  document.addEventListener("click", function () { activity(); if (st.on) setTimeout(fit, 80); });
-  window.addEventListener("resize", function () { if (st.on) fit(); });
+  document.addEventListener("mousemove", function (e) {
+    if (!st.on) return;
+    body.classList.toggle("chrome-on", e.clientY > window.innerHeight - 92);
+  });
+  edge.addEventListener("click", function () { body.classList.toggle("chrome-on"); });
+  document.addEventListener("click", function () { if (st.on) setTimeout(fit, 80); });
+  window.addEventListener("resize", function () {
+    if (!st.on) return;
+    fit();
+    sizeCanvas();
+  });
 
   document.addEventListener("keydown", function (e) {
     var t = e.target;
@@ -1370,6 +1533,9 @@
     if (low === "a") { e.preventDefault(); setMode("all"); return; }
     if (low === "f") { e.preventDefault(); toggleFull(); return; }
     if (low === "p") { e.preventDefault(); setPresenter(!st.presenter); return; }
+    if (low === "d") { e.preventDefault(); setDraw(!st.draw); return; }
+    if (st.draw && low === "c") { e.preventDefault(); clearInk(); return; }
+    if (st.draw && low === "e") { e.preventDefault(); pen.eraser = !pen.eraser; paintTools(); return; }
   });
 
   document.addEventListener("fullscreenchange", function () { paint(); setTimeout(fit, 140); });
