@@ -903,4 +903,445 @@
   }
 })();
 </script>
+<style>
+  /* ---------- presentation deck ---------- */
+  .present-btn {
+    font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+    padding: 7px 15px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--ink); margin-left: 10px;
+  }
+  .present-btn:hover { border-color: var(--gold); }
+  .present-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  body.deck { overflow: hidden; }
+  body.deck nav.chapters { display: none; }
+  body.deck > header.hero, body.deck > section, body.deck > footer.contact { display: none; }
+  body.deck > .deck-active {
+    display: flex; flex-direction: column; justify-content: safe center;
+    min-height: 100vh; max-height: 100vh; overflow-y: auto;
+    padding: 46px 0 112px; margin: 0;
+  }
+  body.deck [data-step] {
+    opacity: 0; transform: translateY(10px);
+    transition: opacity .34s ease, transform .34s ease;
+  }
+  body.deck [data-step].step-on { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    body.deck [data-step] { transition: none; }
+  }
+
+  .deck-ui { display: none; }
+  body.deck .deck-ui { display: block; }
+  .deck-ui .layer { transition: opacity .35s ease; }
+  body.deck-idle .deck-ui .layer.fades { opacity: 0; pointer-events: none; }
+
+  /* status bar + key strip */
+  .deck-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 80;
+    display: flex; align-items: center; gap: 14px 22px; flex-wrap: wrap;
+    padding: 11px 22px;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: blur(12px); border-top: 1px solid var(--grid);
+  }
+  .deck-bar .status { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; min-width: 0; }
+  .deck-bar .s-num {
+    font-variant-numeric: tabular-nums; font-weight: 800; font-size: 12px;
+    letter-spacing: .06em; color: var(--gold);
+  }
+  .deck-bar .s-name { font-weight: 700; font-size: 14px; color: var(--ink); }
+  .deck-bar .s-part, .deck-bar .s-mode, .deck-bar .s-points {
+    font-size: 12px; color: var(--muted); font-weight: 600;
+  }
+  .deck-bar .s-mode { text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); }
+  .deck-bar .s-points { font-variant-numeric: tabular-nums; }
+  .deck-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .deck-strip button {
+    font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 8px; border: 1px solid var(--grid);
+    background: transparent; color: var(--ink-2); font-size: 12px; font-weight: 600;
+  }
+  .deck-strip button:hover { border-color: var(--gold); color: var(--ink); }
+  .deck-strip button:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .deck-strip button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .deck-strip kbd {
+    font-family: inherit; font-size: 11px; font-weight: 800; letter-spacing: .04em;
+    background: var(--surface-2); color: var(--ink); border-radius: 4px; padding: 1px 5px;
+    border: 1px solid var(--grid);
+  }
+  .deck-strip button[aria-pressed="true"] kbd { background: var(--bg); border-color: transparent; }
+
+  /* contents */
+  .deck-toc {
+    position: fixed; inset: 0; z-index: 90; display: none;
+    background: color-mix(in srgb, var(--hero-bg) 82%, transparent);
+    backdrop-filter: blur(6px); padding: 40px 16px; overflow-y: auto;
+  }
+  .deck-toc.open { display: block; }
+  .deck-toc .panel {
+    max-width: 640px; margin: 0 auto; background: var(--surface);
+    border: 1px solid var(--grid); border-radius: 18px; padding: 28px; box-shadow: var(--shadow);
+  }
+  .deck-toc h3 {
+    font-family: "Bricolage Grotesque", sans-serif; font-size: 24px; font-weight: 800; margin: 0;
+  }
+  .deck-toc .legend {
+    display: flex; gap: 18px; flex-wrap: wrap; margin: 12px 0 20px;
+    font-size: 12.5px; color: var(--muted); font-weight: 600;
+  }
+  .deck-toc .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+  .dot.red { background: var(--red); }
+  .dot.green { background: var(--green); }
+  .deck-toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .deck-toc li button {
+    width: 100%; font: inherit; cursor: pointer; text-align: left;
+    display: grid; grid-template-columns: 26px 12px 1fr auto; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--ink);
+  }
+  .deck-toc li button:hover { background: var(--surface-2); }
+  .deck-toc li button:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .deck-toc li button .n {
+    font-variant-numeric: tabular-nums; font-weight: 800; font-size: 12px; color: var(--muted);
+  }
+  .deck-toc li button .nm { font-weight: 600; font-size: 14.5px; }
+  .deck-toc li button .pt { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  .deck-toc li button[aria-current="true"] { border-color: var(--gold); background: var(--gold-soft); }
+  .deck-toc li button[aria-current="true"] .here {
+    font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--gold);
+  }
+  .deck-toc .hint { margin: 18px 0 0; font-size: 12.5px; color: var(--muted); }
+
+  /* presenter */
+  .deck-presenter {
+    position: fixed; right: 20px; bottom: 76px; z-index: 85; display: none;
+    width: 290px; background: var(--hero-bg); color: var(--hero-ink);
+    border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow);
+  }
+  .deck-presenter.open { display: block; }
+  .deck-presenter .k {
+    font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #d9a643;
+  }
+  .deck-presenter .v { font-size: 15px; font-weight: 600; margin: 3px 0 14px; }
+  .deck-presenter .v.dim { color: var(--hero-muted); font-weight: 500; }
+  .deck-presenter .clock {
+    font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 800;
+    font-family: "Bricolage Grotesque", sans-serif; margin: 0;
+  }
+
+  .deck-toast {
+    position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 95;
+    background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 999px;
+    font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .3s ease;
+  }
+  .deck-toast.show { opacity: 1; }
+
+  @media (max-width: 720px) {
+    .deck-strip { margin-left: 0; }
+    .deck-bar { padding: 9px 14px; }
+    .deck-toc li button { grid-template-columns: 22px 10px 1fr; }
+    .deck-toc li button .pt { display: none; }
+  }
+</style>
+<script>
+(function () {
+  "use strict";
+
+  var SLIDES = [
+    { sel: "header.hero",    name: "Building assets for retirement", part: "Opening",                          tone: "red",   steps: [] },
+    { sel: "#why",           name: "Guess the 2015 price",           part: "Part 1 · Why build assets",    tone: "red",   steps: [".quiz-card", ".quiz-tease"] },
+    { sel: "#test",          name: "The $100 test",                  part: "Part 1 · Why build assets",    tone: "red",   steps: [".bar-row", ".punchline"] },
+    { sel: "#kopi",          name: "Kopi-nomics, 2016 to 2066",      part: "Part 1 · Why build assets",    tone: "red",   steps: [".kopi-tile", ".kopi-note"] },
+    { sel: "#reality",       name: "Retirement reality check",       part: "Part 1 · Why build assets",    tone: "red",   steps: [".tile", ".clips"] },
+    { sel: "#how",           name: "Property progression",           part: "Part 2 · How to build assets", tone: "green", steps: [".prop-stack", ".prop-result"] },
+    { sel: "#proof",         name: "One block, twenty years",        part: "Part 2 · How to build assets", tone: "green", steps: [".tx-wrap", ".wood-stats"] },
+    { sel: "#legacy",        name: "What if we do not retire well?", part: "Part 2 · How to build assets", tone: "red",   steps: [".legacy-lede", ".legacy-clip", ".who-close", ".who-card"] },
+    { sel: "footer.contact", name: "Let us map your progression",    part: "Closing",                          tone: "green", steps: [] }
+  ];
+
+  var body = document.body;
+  var st = { on: false, i: 0, step: 0, mode: "step", toc: false, presenter: false, from: null, t0: 0 };
+  var ui = {};
+  var idleTimer, clockTimer, toastTimer;
+
+  SLIDES.forEach(function (s) {
+    s.node = document.querySelector(s.sel);
+    s.points = [];
+    s.steps.forEach(function (sel) {
+      Array.prototype.forEach.call(s.node.querySelectorAll(sel), function (el) { s.points.push(el); });
+    });
+    s.points.forEach(function (el, k) { el.setAttribute("data-step", k); });
+  });
+
+  var KEYS = [
+    { k: "T", label: "Contents", act: function () { setToc(!st.toc); } },
+    { k: "S", label: "Step", act: function () { setMode("step"); }, pressed: function () { return st.mode === "step"; } },
+    { k: "A", label: "All", act: function () { setMode("all"); }, pressed: function () { return st.mode === "all"; } },
+    { k: "F", label: "Full screen", act: toggleFull, pressed: function () { return !!document.fullscreenElement; } },
+    { k: "P", label: "Presenter", act: function () { setPresenter(!st.presenter); }, pressed: function () { return st.presenter; } },
+    { k: "←", label: "Back", act: back },
+    { k: "→", label: "Next", act: next },
+    { k: "Esc", label: "Exit", act: escape }
+  ];
+
+  function el(tag, cls, html) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html != null) e.innerHTML = html;
+    return e;
+  }
+
+  var root = el("div", "deck-ui");
+
+  var bar = el("div", "deck-bar layer fades");
+  bar.innerHTML =
+    '<div class="status">' +
+      '<span class="s-num"></span><span class="s-name"></span><span class="s-part"></span>' +
+    '</div>' +
+    '<span class="s-mode"></span><span class="s-points"></span>';
+
+  var strip = el("div", "deck-strip");
+  KEYS.forEach(function (def) {
+    var b = el("button", null, "<kbd>" + def.k + "</kbd><span>" + def.label + "</span>");
+    b.type = "button";
+    b.title = def.label + " (" + def.k + ")";
+    b.addEventListener("click", function () { def.act(); b.blur(); });
+    def.btn = b;
+    strip.appendChild(b);
+  });
+  bar.appendChild(strip);
+
+  var toc = el("div", "deck-toc layer");
+  toc.innerHTML =
+    '<div class="panel">' +
+      '<h3>Contents</h3>' +
+      '<p class="legend">' +
+        '<span><i class="dot red"></i>the cost of not planning</span>' +
+        '<span><i class="dot green"></i>what to do about it</span>' +
+      '</p>' +
+      '<ol></ol>' +
+      '<p class="hint">Press a number key to jump straight there. Backspace returns you to the slide you left.</p>' +
+    '</div>';
+  var list = toc.querySelector("ol");
+  SLIDES.forEach(function (s, i) {
+    var li = el("li");
+    var b = el("button", null,
+      '<span class="n">' + (i + 1) + '</span>' +
+      '<i class="dot ' + s.tone + '"></i>' +
+      '<span class="nm">' + s.name + '<br><span class="pt">' + s.part + '</span></span>' +
+      '<span class="here">You are here</span>');
+    b.type = "button";
+    b.addEventListener("click", function () { jump(i); setToc(false); });
+    s.tocBtn = b;
+    li.appendChild(b);
+    list.appendChild(li);
+  });
+  toc.addEventListener("click", function (e) { if (e.target === toc) setToc(false); });
+
+  var presenter = el("div", "deck-presenter layer");
+  presenter.innerHTML =
+    '<div class="k">Elapsed</div><p class="clock">00:00</p>' +
+    '<div class="k" style="margin-top:14px">Now</div><div class="v now"></div>' +
+    '<div class="k">Next</div><div class="v dim next"></div>' +
+    '<div class="k">Points left</div><div class="v left"></div>';
+
+  var toast = el("div", "deck-toast layer");
+
+  root.appendChild(bar);
+  root.appendChild(toc);
+  root.appendChild(presenter);
+  root.appendChild(toast);
+  document.body.appendChild(root);
+
+  ui.num = bar.querySelector(".s-num");
+  ui.name = bar.querySelector(".s-name");
+  ui.part = bar.querySelector(".s-part");
+  ui.mode = bar.querySelector(".s-mode");
+  ui.points = bar.querySelector(".s-points");
+  ui.now = presenter.querySelector(".now");
+  ui.next = presenter.querySelector(".next");
+  ui.left = presenter.querySelector(".left");
+  ui.clock = presenter.querySelector(".clock");
+
+  var navWrap = document.querySelector("nav.chapters .wrap");
+  if (navWrap) {
+    var pb = el("button", "present-btn", "Present");
+    pb.type = "button";
+    pb.addEventListener("click", function () { enter(currentSectionIndex()); });
+    navWrap.appendChild(pb);
+  }
+
+  function currentSectionIndex() {
+    var best = 0, bestTop = Infinity;
+    SLIDES.forEach(function (s, i) {
+      var t = Math.abs(s.node.getBoundingClientRect().top);
+      if (t < bestTop) { bestTop = t; best = i; }
+    });
+    return best;
+  }
+
+  function primeReveals() {
+    Array.prototype.forEach.call(document.querySelectorAll(".reveal"), function (n) { n.classList.add("in"); });
+    Array.prototype.forEach.call(document.querySelectorAll("#cpiBars .grow"), function (n) { n.style.width = n.dataset.w + "%"; });
+    Array.prototype.forEach.call(document.querySelectorAll("#cpiBars .bar-val"), function (n) { n.style.left = "calc(" + n.dataset.l + "% + 10px)"; });
+  }
+
+  function enter(i) {
+    if (st.on) return;
+    st.on = true;
+    st.t0 = Date.now();
+    body.classList.add("deck");
+    primeReveals();
+    show(i || 0);
+    clockTimer = setInterval(tickClock, 1000);
+    activity();
+  }
+
+  function exit() {
+    if (!st.on) return;
+    st.on = false;
+    setToc(false);
+    setPresenter(false);
+    clearInterval(clockTimer);
+    var node = SLIDES[st.i].node;
+    body.classList.remove("deck", "deck-idle");
+    SLIDES.forEach(function (s) { s.node.classList.remove("deck-active"); });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-step]"), function (n) { n.classList.remove("step-on"); });
+    node.scrollIntoView();
+  }
+
+  function show(i) {
+    st.i = Math.max(0, Math.min(SLIDES.length - 1, i));
+    SLIDES.forEach(function (s, k) { s.node.classList.toggle("deck-active", k === st.i); });
+    SLIDES[st.i].node.scrollTop = 0;
+    st.step = st.mode === "all" ? SLIDES[st.i].points.length : 0;
+    paint();
+  }
+
+  function jump(i) {
+    if (i === st.i) return;
+    var from = st.i;
+    show(i);
+    st.from = from;
+    paint();
+  }
+
+  function paint() {
+    var s = SLIDES[st.i];
+    s.points.forEach(function (p, k) { p.classList.toggle("step-on", k < st.step); });
+    var left = s.points.length - st.step;
+
+    ui.num.textContent = (st.i + 1) + " / " + SLIDES.length;
+    ui.name.textContent = s.name;
+    ui.part.textContent = s.part;
+    ui.mode.textContent = st.mode === "all" ? "All" : "Step";
+    ui.points.textContent = s.points.length === 0
+      ? "no points to reveal"
+      : (left === 0 ? "all points shown" : left + (left === 1 ? " point" : " points") + " to come");
+
+    ui.now.textContent = s.name;
+    ui.next.textContent = SLIDES[st.i + 1] ? SLIDES[st.i + 1].name : "End of deck";
+    ui.left.textContent = String(left);
+
+    KEYS.forEach(function (d) { if (d.pressed) d.btn.setAttribute("aria-pressed", d.pressed() ? "true" : "false"); });
+    SLIDES.forEach(function (x, k) { x.tocBtn.setAttribute("aria-current", k === st.i ? "true" : "false"); });
+  }
+
+  function next() {
+    var s = SLIDES[st.i];
+    if (st.mode === "step" && st.step < s.points.length) { st.step++; paint(); return; }
+    if (st.i < SLIDES.length - 1) show(st.i + 1);
+  }
+
+  function back() {
+    if (st.mode === "step" && st.step > 0) { st.step--; paint(); return; }
+    if (st.i > 0) {
+      show(st.i - 1);
+      if (st.mode === "step") { st.step = SLIDES[st.i].points.length; paint(); }
+    }
+  }
+
+  function setMode(m) { st.mode = m; st.step = m === "all" ? SLIDES[st.i].points.length : 0; paint(); }
+  function setToc(v) { st.toc = v; toc.classList.toggle("open", v); if (v) body.classList.remove("deck-idle"); paint(); }
+  function setPresenter(v) { st.presenter = v; presenter.classList.toggle("open", v); paint(); }
+
+  function toggleFull() {
+    if (document.fullscreenElement) { document.exitFullscreen(); setTimeout(paint, 120); return; }
+    var msg = "This browser would not go full screen — use its own full-screen control.";
+    try {
+      var p = document.documentElement.requestFullscreen();
+      if (p && p.catch) p.catch(function () { say(msg); });
+    } catch (err) { say(msg); }
+    setTimeout(paint, 120);
+  }
+
+  function say(m) {
+    toast.textContent = m;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.classList.remove("show"); }, 3600);
+  }
+
+  function lightboxOpen() {
+    var lb = document.getElementById("lightbox");
+    return !!lb && lb.classList.contains("open");
+  }
+
+  function escape() {
+    if (lightboxOpen()) return;
+    if (st.presenter) { setPresenter(false); return; }
+    if (st.toc) { setToc(false); return; }
+    if (document.fullscreenElement) { document.exitFullscreen(); return; }
+    exit();
+  }
+
+  function tickClock() {
+    var s = Math.floor((Date.now() - st.t0) / 1000);
+    ui.clock.textContent = ("0" + Math.floor(s / 60)).slice(-2) + ":" + ("0" + (s % 60)).slice(-2);
+  }
+
+  function activity() {
+    if (!st.on) return;
+    body.classList.remove("deck-idle");
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(function () {
+      if (st.on && !st.toc && !st.presenter) body.classList.add("deck-idle");
+    }, 2600);
+  }
+  document.addEventListener("mousemove", activity);
+  document.addEventListener("click", activity);
+
+  document.addEventListener("keydown", function (e) {
+    var t = e.target;
+    var tag = t && t.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (t && t.isContentEditable)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    if (!st.on) {
+      if (e.key === "p" || e.key === "P") { e.preventDefault(); enter(currentSectionIndex()); }
+      return;
+    }
+    activity();
+
+    var k = e.key;
+    if (k === "Escape") { e.preventDefault(); escape(); return; }
+    if (lightboxOpen()) return;
+
+    if (k === "ArrowRight" || k === "PageDown" || (k === " " && tag !== "BUTTON")) { e.preventDefault(); next(); return; }
+    if (k === "ArrowLeft" || k === "PageUp") { e.preventDefault(); back(); return; }
+    if (k === "Backspace") { e.preventDefault(); if (st.from != null) { var f = st.from; st.from = null; show(f); } return; }
+    if (k === "Home") { e.preventDefault(); jump(0); return; }
+    if (k === "End") { e.preventDefault(); jump(SLIDES.length - 1); return; }
+    if (/^[1-9]$/.test(k)) { e.preventDefault(); if (+k <= SLIDES.length) jump(+k - 1); return; }
+
+    var low = k.toLowerCase();
+    if (low === "t") { e.preventDefault(); setToc(!st.toc); return; }
+    if (low === "s") { e.preventDefault(); setMode("step"); return; }
+    if (low === "a") { e.preventDefault(); setMode("all"); return; }
+    if (low === "f") { e.preventDefault(); toggleFull(); return; }
+    if (low === "p") { e.preventDefault(); setPresenter(!st.presenter); return; }
+  });
+
+  document.addEventListener("fullscreenchange", paint);
+})();
+</script>
 </html>
