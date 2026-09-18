@@ -923,15 +923,18 @@
     padding: 0; margin: 0;
   }
   body.deck > .deck-active > .wrap {
-    position: absolute; left: 50%;
-    top: calc((100vh - var(--deck-bar-h, 104px)) / 2);
+    position: absolute; left: 50%; top: 50%;
     width: min(1080px, 100vw); max-width: none;
     transform: translate(-50%, -50%) scale(var(--deck-k, 1));
     transform-origin: center center;
   }
-  /* the transaction table is the tallest slide — tighten it so it scales less */
-  body.deck .tx th { padding-top: 5px; padding-bottom: 5px; }
-  body.deck .tx td { padding-top: 3px; padding-bottom: 3px; }
+  /* presentation density: slides give back padding so they scale up larger */
+  body.deck section { padding: 0; }
+  body.deck .sec-head { margin-bottom: 20px; }
+  body.deck .card { padding: 18px; }
+  body.deck .footnote { margin-top: 9px; }
+  body.deck .tx th { padding-top: 4px; padding-bottom: 4px; }
+  body.deck .tx td { padding-top: 2px; padding-bottom: 2px; }
   body.deck [data-step] {
     opacity: 0; transform: translateY(10px);
     transition: opacity .34s ease, transform .34s ease;
@@ -1378,16 +1381,16 @@
   /* scale the active slide so it lands on one screen, never scrolling */
   function fit() {
     if (!st.on) return;
-    var barH = bar.offsetHeight + 22;
-    document.documentElement.style.setProperty("--deck-bar-h", barH + "px");
     var wrap = SLIDES[st.i].node.querySelector(".wrap");
     if (!wrap) return;
     wrap.style.setProperty("--deck-k", "1");
     var natH = wrap.offsetHeight, natW = wrap.offsetWidth;
     if (!natH || !natW) return;
-    var k = Math.min(1, (window.innerHeight - barH - 26) / natH, (window.innerWidth - 20) / natW);
+    /* the bar only appears when called for, so a slide may use the whole screen,
+       and a slide smaller than the screen is scaled up rather than left small */
+    var k = Math.min((window.innerHeight - 24) / natH, (window.innerWidth - 24) / natW);
     if (!isFinite(k) || k <= 0) k = 1;
-    wrap.style.setProperty("--deck-k", k.toFixed(4));
+    wrap.style.setProperty("--deck-k", Math.min(k, 2.4).toFixed(4));
   }
 
   function show(i) {
