@@ -915,12 +915,23 @@
 
   body.deck { overflow: hidden; }
   body.deck nav.chapters { display: none; }
-  body.deck > header.hero, body.deck > section, body.deck > footer.contact { display: none; }
+  body.deck > header.hero:not(.deck-active),
+  body.deck > section:not(.deck-active),
+  body.deck > footer.contact:not(.deck-active) { display: none; }
   body.deck > .deck-active {
-    display: flex; flex-direction: column; justify-content: safe center;
-    min-height: 100vh; max-height: 100vh; overflow-y: auto;
-    padding: 46px 0 112px; margin: 0;
+    position: fixed; inset: 0; display: block; overflow: hidden;
+    padding: 0; margin: 0;
   }
+  body.deck > .deck-active > .wrap {
+    position: absolute; left: 50%;
+    top: calc((100vh - var(--deck-bar-h, 104px)) / 2);
+    width: min(1080px, 100vw); max-width: none;
+    transform: translate(-50%, -50%) scale(var(--deck-k, 1));
+    transform-origin: center center;
+  }
+  /* the transaction table is the tallest slide — tighten it so it scales less */
+  body.deck .tx th { padding-top: 5px; padding-bottom: 5px; }
+  body.deck .tx td { padding-top: 3px; padding-bottom: 3px; }
   body.deck [data-step] {
     opacity: 0; transform: translateY(10px);
     transition: opacity .34s ease, transform .34s ease;
@@ -1192,6 +1203,8 @@
     body.classList.add("deck");
     primeReveals();
     show(i || 0);
+    setTimeout(fit, 60);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
     clockTimer = setInterval(tickClock, 1000);
     activity();
   }
@@ -1206,7 +1219,23 @@
     body.classList.remove("deck", "deck-idle");
     SLIDES.forEach(function (s) { s.node.classList.remove("deck-active"); });
     Array.prototype.forEach.call(document.querySelectorAll("[data-step]"), function (n) { n.classList.remove("step-on"); });
+    Array.prototype.forEach.call(document.querySelectorAll(".wrap"), function (w) { w.style.removeProperty("--deck-k"); });
     node.scrollIntoView();
+  }
+
+  /* scale the active slide so it lands on one screen, never scrolling */
+  function fit() {
+    if (!st.on) return;
+    var barH = bar.offsetHeight + 22;
+    document.documentElement.style.setProperty("--deck-bar-h", barH + "px");
+    var wrap = SLIDES[st.i].node.querySelector(".wrap");
+    if (!wrap) return;
+    wrap.style.setProperty("--deck-k", "1");
+    var natH = wrap.offsetHeight, natW = wrap.offsetWidth;
+    if (!natH || !natW) return;
+    var k = Math.min(1, (window.innerHeight - barH - 26) / natH, (window.innerWidth - 20) / natW);
+    if (!isFinite(k) || k <= 0) k = 1;
+    wrap.style.setProperty("--deck-k", k.toFixed(4));
   }
 
   function show(i) {
@@ -1215,6 +1244,7 @@
     SLIDES[st.i].node.scrollTop = 0;
     st.step = st.mode === "all" ? SLIDES[st.i].points.length : 0;
     paint();
+    fit();
   }
 
   function jump(i) {
@@ -1308,7 +1338,8 @@
     }, 2600);
   }
   document.addEventListener("mousemove", activity);
-  document.addEventListener("click", activity);
+  document.addEventListener("click", function () { activity(); if (st.on) setTimeout(fit, 80); });
+  window.addEventListener("resize", function () { if (st.on) fit(); });
 
   document.addEventListener("keydown", function (e) {
     var t = e.target;
@@ -1341,7 +1372,7 @@
     if (low === "p") { e.preventDefault(); setPresenter(!st.presenter); return; }
   });
 
-  document.addEventListener("fullscreenchange", paint);
+  document.addEventListener("fullscreenchange", function () { paint(); setTimeout(fit, 140); });
 })();
 </script>
 </html>
