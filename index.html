@@ -1100,7 +1100,7 @@
   ];
 
   var body = document.body;
-  var st = { on: false, i: 0, step: 0, mode: "step", toc: false, presenter: false, draw: false, from: null, t0: 0 };
+  var st = { on: false, i: 0, step: 0, mode: "all", toc: false, presenter: false, draw: false, from: null, t0: 0 };
   var ui = {};
   var idleTimer, clockTimer, toastTimer;
 
@@ -1115,7 +1115,6 @@
 
   var KEYS = [
     { k: "T", label: "Contents", act: function () { setToc(!st.toc); } },
-    { k: "S", label: "Step", act: function () { setMode("step"); }, pressed: function () { return st.mode === "step"; } },
     { k: "A", label: "All", act: function () { setMode("all"); }, pressed: function () { return st.mode === "all"; } },
     { k: "F", label: "Full screen", act: toggleFull, pressed: function () { return !!document.fullscreenElement; } },
     { k: "P", label: "Presenter", act: function () { setPresenter(!st.presenter); }, pressed: function () { return st.presenter; } },
@@ -1529,7 +1528,6 @@
 
     var low = k.toLowerCase();
     if (low === "t") { e.preventDefault(); setToc(!st.toc); return; }
-    if (low === "s") { e.preventDefault(); setMode("step"); return; }
     if (low === "a") { e.preventDefault(); setMode("all"); return; }
     if (low === "f") { e.preventDefault(); toggleFull(); return; }
     if (low === "p") { e.preventDefault(); setPresenter(!st.presenter); return; }
