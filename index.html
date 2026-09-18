@@ -326,6 +326,8 @@
   .who-card { background: var(--surface); border: 1px solid var(--grid); border-radius: 16px; padding: 26px; box-shadow: var(--shadow); overflow: hidden; }
   .who-card .who { font-family: "Bricolage Grotesque", sans-serif; font-size: 22px; font-weight: 800; }
   .who-card p { color: var(--ink-2); font-size: 14.5px; margin: 10px 0 0; }
+  /* the closing cards read as one stretch on the scrolling page, two slides in the deck */
+  #legacy2 { padding-top: 0; }
   .who-close { margin: 4px 0 26px; font-family: "Bricolage Grotesque", sans-serif; font-size: clamp(22px, 3vw, 30px); font-weight: 700; max-width: 26ch; }
   .who-close em { font-style: normal; color: var(--gold); }
   .who-close .too { color: var(--red); font-weight: 800; text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 5px; }
@@ -613,6 +615,11 @@
         <p class="ctx-strong">Planning isn't about fear. It's about keeping the choice yours.</p>
       </div>
     </div>
+  </div>
+</section>
+
+<section id="legacy2">
+  <div class="wrap">
     <p class="who-close reveal">Retiring well isn't for you alone &mdash; <em>it's for them</em> <span class="too">TOO</span>.</p>
     <div class="who-grid">
       <div class="who-card reveal">
@@ -928,6 +935,9 @@
     transform: translate(-50%, -50%) scale(var(--deck-k, 1));
     transform-origin: center center;
   }
+  /* this slide has height to spare, so the clipping is shown larger */
+  body.deck #legacy .legacy-clip { grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 36px; }
+  body.deck #legacy .clip .imgwrap { height: 350px; }
   /* presentation density: slides give back padding so they scale up larger */
   body.deck section { padding: 0; }
   body.deck .sec-head { margin-bottom: 20px; }
@@ -1098,7 +1108,8 @@
     { sel: "#reality",       name: "Retirement reality check",       part: "Part 1 · Why build assets",    tone: "red",   steps: [".tile", ".clips"] },
     { sel: "#how",           name: "Property progression",           part: "Part 2 · How to build assets", tone: "green", steps: [".prop-stack", ".prop-result"] },
     { sel: "#proof",         name: "One block, twenty years",        part: "Part 2 · How to build assets", tone: "green", steps: [".tx-wrap", ".wood-stats"] },
-    { sel: "#legacy",        name: "What if we do not retire well?", part: "Part 2 · How to build assets", tone: "red",   steps: [".legacy-lede", ".legacy-clip", ".who-close", ".who-card"] },
+    { sel: "#legacy",        name: "What if we do not retire well?", part: "Part 2 · How to build assets", tone: "red",   steps: [".legacy-lede", ".legacy-clip"] },
+    { sel: "#legacy2",       name: "It is for them too",             part: "Part 2 · How to build assets", tone: "red",   steps: [".who-close", ".who-card"] },
     { sel: "footer.contact", name: "Let us map your progression",    part: "Closing",                          tone: "green", steps: [] }
   ];
 
@@ -1527,7 +1538,12 @@
     if (k === "Backspace") { e.preventDefault(); if (st.from != null) { var f = st.from; st.from = null; show(f); } return; }
     if (k === "Home") { e.preventDefault(); jump(0); return; }
     if (k === "End") { e.preventDefault(); jump(SLIDES.length - 1); return; }
-    if (/^[1-9]$/.test(k)) { e.preventDefault(); if (+k <= SLIDES.length) jump(+k - 1); return; }
+    if (/^[0-9]$/.test(k)) {
+      e.preventDefault();
+      var idx = (k === "0" ? 10 : +k) - 1;
+      if (idx < SLIDES.length) jump(idx);
+      return;
+    }
 
     var low = k.toLowerCase();
     if (low === "t") { e.preventDefault(); setToc(!st.toc); return; }
